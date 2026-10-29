@@ -1,0 +1,34 @@
+function calificarExamen(e) {
+  var response = e.response;
+  var itemResponses = response.getItemResponses();
+  
+  var matricula = parseInt(itemResponses[1].getResponse()); // Toma la matrícula del alumno
+  var digito = matricula % 10; // Último dígito para parametrizar
+  
+  // Parámetros dinámicos basados en la matrícula del alumno:
+  // Ejercicio 1: Vt = 200 + (digito * 5), Ra = 0.2 + (digito * 0.02)
+  var Vt = 200 + (digito * 5);
+  var Ra = 0.2 + (digito * 0.02);
+  var Rf = 100;
+  var IL = 40;
+  
+  // Respuestas correctas calculadas dinámicamente:
+  var If_correcto = Vt / Rf;
+  var Ia_correcto = IL - If_correcto;
+  var Ea_correcto = Vt - (Ia_correcto * Ra);
+  
+  // Obtener respuesta del alumno
+  var respuestaAlumnoEa = parseFloat(itemResponses[2].getResponse());
+  
+  // Tolerancia del 2% para margen de error por redondeo
+  var esCorrecto = Math.abs(respuestaAlumnoEa - Ea_correcto) <= (Ea_correcto * 0.02);
+  
+  // Enviar correo automático con la calificación inmediata
+  var email = response.getRespondentEmail();
+  var puntaje = esCorrecto ? 100 : 0;
+  
+  MailApp.sendEmail(email, "Resultado de tu Examen de Motores CD", 
+    "Hola, tu resultado para la FCEM calculada es: " + (esCorrecto ? "CORRECTO (100/100)" : "INCORRECTO") + 
+    "\nTu valor ingresado: " + respuestaAlumnoEa + 
+    "\nValor esperado exacto: " + Ea_correcto.toFixed(2) + " V");
+}

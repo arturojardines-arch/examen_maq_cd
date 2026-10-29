@@ -5,8 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Examen Interactivo - Motores de Corriente Directa</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
-  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800 font-sans p-4 md:p-8">
 
@@ -20,7 +18,7 @@
     <!-- Formulario de Registro -->
     <section id="sec-registro" class="space-y-4">
       <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded text-sm text-blue-900">
-        <strong>Instrucciones:</strong> Ingresa tu nombre y tu Número de Control (Matrícula). Los datos numéricos de tus ejercicios se generarán de forma única con tu matrícula.
+        <strong>Instrucciones:</strong> Ingresa tu nombre y tu Número de Control (Matrícula). Los datos numéricos de tus ejercicios se generarán de forma única con tu matrícula. Al finalizar, la calificación y el reporte se enviarán automáticamente al docente.
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
@@ -41,7 +39,7 @@
 
     <!-- Examen (Oculto al inicio) -->
     <section id="sec-examen" class="hidden space-y-8">
-      <div class="flex justify-between items-center bg-slate-800 text-white p-4 rounded-lg">
+      <div class="flex justify-between items-center bg-slate-800 text-white p-4 rounded-lg shadow">
         <div>
           <span class="text-xs text-slate-400 block">Estudiante:</span>
           <span id="disp-estudiante" class="font-bold"></span>
@@ -55,7 +53,7 @@
       <form id="form-examen" onsubmit="evaluarExamen(event)" class="space-y-8">
         <div id="contenedor-preguntas" class="space-y-8"></div>
 
-        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-lg text-lg transition-colors shadow-md">
+        <button type="submit" id="btn-enviar" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-lg text-lg transition-colors shadow-md">
           Finalizar y Calificar Examen
         </button>
       </form>
@@ -67,9 +65,8 @@
         <h2 class="text-xl font-bold text-slate-700 mb-2">Resultado de la Evaluación</h2>
         <div id="disp-calificacion" class="text-5xl font-extrabold my-2"></div>
         <p id="disp-resumen-estudiante" class="text-sm text-slate-600"></p>
+        <p id="disp-estatus-envio" class="text-xs font-semibold text-blue-600 mt-2">Enviando reporte al profesor...</p>
       </div>
-
-      <div id="contenedor-desglose" class="space-y-6"></div>
 
       <div class="flex gap-4">
         <button onclick="window.print()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-semibold py-3 rounded-lg transition-colors">
@@ -84,6 +81,11 @@
     let timerInterval = null;
     let tiempoRestante = 3600;
     let datosCalculados = {};
+    let nombreEstudiante = "";
+    let matriculaEstudiante = "";
+
+    // ⚠️ REEMPLAZA ESTA URL CON TU ENDPOINT GRATUITO DE FORMSPREE.IO
+    const FORMSPREE_ENDPOINT = 'URL_FORMSPREE_AQUI';
 
     function rng(min, max, dec = 0) {
       seedMatricula = (seedMatricula * 9301 + 49297) % 233280;
@@ -93,16 +95,16 @@
     }
 
     function comenzarExamen() {
-      const nombre = document.getElementById('input-nombre').value.trim();
-      const mat = document.getElementById('input-matricula').value.trim();
+      nombreEstudiante = document.getElementById('input-nombre').value.trim();
+      matriculaEstudiante = document.getElementById('input-matricula').value.trim();
 
-      if (!nombre || !mat) {
+      if (!nombreEstudiante || !matriculaEstudiante) {
         alert("Por favor ingresa tu nombre y número de control.");
         return;
       }
 
-      seedMatricula = parseInt(mat) || 12345;
-      document.getElementById('disp-estudiante').innerText = `${nombre} (${mat})`;
+      seedMatricula = parseInt(matriculaEstudiante) || 12345;
+      document.getElementById('disp-estudiante').innerText = `${nombreEstudiante} (${matriculaEstudiante})`;
 
       generarReactivos();
 
@@ -110,7 +112,6 @@
       document.getElementById('sec-examen').classList.remove('hidden');
 
       iniciarTimer();
-      if (window.MathJax) MathJax.typesetPromise();
     }
 
     function iniciarTimer() {
@@ -160,55 +161,92 @@
       const Pout3 = HP3 * 746;
       const Eta3 = (Pout3 / Pin3) * 100;
 
-      datosCalculados = { Ea1, T1, Ea2, Ea3, Eta3 };
+      datosCalculados = { Ea1, T1, Ea2, Ea3, Eta3, Vt1, Ra1, Rf1, IL1, n1, Vt2, Ra2, Rs2, I2, Vt3, Ra3, Rs3, Rf3, IL3, HP3 };
 
       const html = `
-        <div class="p-5 border rounded-lg bg-slate-50 space-y-3">
-          <h3 class="font-bold text-lg text-slate-800">Reactivo 1: Motor Shunt</h3>
-          <p class="text-sm">Un motor CD shunt de <strong>${Vt1} V</strong> tiene $R_a = ${Ra1}\\ \\Omega$ y $R_f = ${Rf1}\\ \\Omega$. Absorbe $I_L = ${IL1}\\text{ A}$ a $n = ${n1}\\text{ rpm}$.</p>
+        <!-- Reactivo 1 -->
+        <div class="p-6 border border-slate-200 rounded-xl bg-slate-50 space-y-4 shadow-sm">
+          <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+            <h3 class="font-bold text-lg text-blue-900">Reactivo 1: Motor Shunt (Derivación)</h3>
+            <span class="text-xs bg-blue-100 text-blue-800 font-semibold px-2.5 py-1 rounded-full">Cuantitativo</span>
+          </div>
+          <p class="text-sm leading-relaxed text-slate-700">
+            Un motor CD shunt alimentado a una tensión de <strong>${Vt1} V</strong> posee una resistencia de armadura 
+            <strong>R<sub>a</sub> = ${Ra1} Ω</strong> y una resistencia de campo <strong>R<sub>f</sub> = ${Rf1} Ω</strong>. 
+            En pleno funcionamiento, el motor absorbe una corriente de línea <strong>I<sub>L</sub> = ${IL1} A</strong> girando a <strong>n = ${n1} rpm</strong>.
+          </p>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-            <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">a) FCEM ($E_a$) en Volts:</label>
-              <input type="number" step="any" id="resp-ea1" required class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none">
+            <div class="bg-white p-3 border rounded-lg">
+              <label class="block text-xs font-bold text-slate-700 mb-1">a) Fuerza Contraelectromotriz (E<sub>a</sub>) en Volts [V]:</label>
+              <input type="number" step="any" id="resp-ea1" required class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ingresa valor numérico">
             </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">b) Par Inducido (N·m):</label>
-              <input type="number" step="any" id="resp-t1" required class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none">
+            <div class="bg-white p-3 border rounded-lg">
+              <label class="block text-xs font-bold text-slate-700 mb-1">b) Par Inducido Desarrollo (τ<sub>ind</sub>) en [N·m]:</label>
+              <input type="number" step="any" id="resp-t1" required class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ingresa valor numérico">
             </div>
           </div>
         </div>
 
-        <div class="p-5 border rounded-lg bg-slate-50 space-y-3">
-          <h3 class="font-bold text-lg text-slate-800">Reactivo 2: Motor Serie</h3>
-          <p class="text-sm">Un motor serie de <strong>${Vt2} V</strong> tiene $R_a = ${Ra2}\\ \\Omega$ y $R_s = ${Rs2}\\ \\Omega$. Absorbe $I_a = ${I2}\\text{ A}$.</p>
-          <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Calcula la FCEM ($E_a$) en Volts:</label>
-            <input type="number" step="any" id="resp-ea2" required class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none">
+        <!-- Reactivo 2 -->
+        <div class="p-6 border border-slate-200 rounded-xl bg-slate-50 space-y-4 shadow-sm">
+          <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+            <h3 class="font-bold text-lg text-blue-900">Reactivo 2: Motor Serie</h3>
+            <span class="text-xs bg-blue-100 text-blue-800 font-semibold px-2.5 py-1 rounded-full">Cuantitativo</span>
+          </div>
+          <p class="text-sm leading-relaxed text-slate-700">
+            Un motor CD con conexión serie opera a una tensión de <strong>${Vt2} V</strong>. Cuenta con una resistencia de inducido 
+            <strong>R<sub>a</sub> = ${Ra2} Ω</strong> y una resistencia de campo serie <strong>R<sub>s</sub> = ${Rs2} Ω</strong>. 
+            Si la corriente consumida por la línea es de <strong>I<sub>a</sub> = ${I2} A</strong>:
+          </p>
+          <div class="bg-white p-3 border rounded-lg">
+            <label class="block text-xs font-bold text-slate-700 mb-1">Calcula la FCEM (E<sub>a</sub>) en Volts [V]:</label>
+            <input type="number" step="any" id="resp-ea2" required class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ingresa valor numérico">
           </div>
         </div>
 
-        <div class="p-5 border rounded-lg bg-slate-50 space-y-3">
-          <h3 class="font-bold text-lg text-slate-800">Reactivo 3: Motor Compound Largo</h3>
-          <p class="text-sm">Un motor compuesto acumulativo largo de <strong>${Vt3} V</strong> consume $I_L = ${IL3}\\text{ A}$ y entrega <strong>${HP3} HP</strong>. Datos: $R_a = ${Ra3}\\ \\Omega$, $R_s = ${Rs3}\\ \\Omega$, $R_f = ${Rf3}\\ \\Omega$.</p>
+        <!-- Reactivo 3 -->
+        <div class="p-6 border border-slate-200 rounded-xl bg-slate-50 space-y-4 shadow-sm">
+          <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+            <h3 class="font-bold text-lg text-blue-900">Reactivo 3: Motor Compound Largo</h3>
+            <span class="text-xs bg-blue-100 text-blue-800 font-semibold px-2.5 py-1 rounded-full">Cuantitativo</span>
+          </div>
+          <p class="text-sm leading-relaxed text-slate-700">
+            Un motor compuesto acumulativo en derivación larga alimentado a <strong>${Vt3} V</strong> consume una corriente total 
+            <strong>I<sub>L</sub> = ${IL3} A</strong> entregando una potencia útil de <strong>${HP3} HP</strong>. 
+            Sus parámetros son: <strong>R<sub>a</sub> = ${Ra3} Ω</strong>, <strong>R<sub>s</sub> = ${Rs3} Ω</strong>, y <strong>R<sub>f</sub> = ${Rf3} Ω</strong>.
+          </p>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-            <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">a) FCEM ($E_a$) en Volts:</label>
-              <input type="number" step="any" id="resp-ea3" required class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none">
+            <div class="bg-white p-3 border rounded-lg">
+              <label class="block text-xs font-bold text-slate-700 mb-1">a) FCEM (E<sub>a</sub>) en Volts [V]:</label>
+              <input type="number" step="any" id="resp-ea3" required class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ingresa valor numérico">
             </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">b) Eficiencia (%):</label>
-              <input type="number" step="any" id="resp-eta3" required class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none">
+            <div class="bg-white p-3 border rounded-lg">
+              <label class="block text-xs font-bold text-slate-700 mb-1">b) Eficiencia Global (η) en Porcentaje [%]:</label>
+              <input type="number" step="any" id="resp-eta3" required class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ej. 85.5">
             </div>
           </div>
         </div>
 
-        <div class="p-5 border rounded-lg bg-slate-50 space-y-3">
-          <h3 class="font-bold text-lg text-slate-800">Reactivo 4: Concepto</h3>
-          <p class="text-sm font-semibold">¿Por qué nunca se debe arrancar un motor serie sin carga mecánica?</p>
-          <div class="space-y-2 text-sm">
-            <label class="flex items-center gap-2"><input type="radio" name="p4" value="a" required> Porque la corriente se eleva al infinito destruyendo la armadura.</label>
-            <label class="flex items-center gap-2"><input type="radio" name="p4" value="b"> Porque el flujo tiende a cero y la velocidad se eleva a niveles peligrosos (embalamiento).</label>
-            <label class="flex items-center gap-2"><input type="radio" name="p4" value="c"> Porque se invierte el sentido de giro automáticamente.</label>
+        <!-- Reactivo 4 -->
+        <div class="p-6 border border-slate-200 rounded-xl bg-slate-50 space-y-4 shadow-sm">
+          <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+            <h3 class="font-bold text-lg text-blue-900">Reactivo 4: Concepto y Seguridad</h3>
+            <span class="text-xs bg-purple-100 text-purple-800 font-semibold px-2.5 py-1 rounded-full">Conceptual</span>
+          </div>
+          <p class="text-sm font-semibold text-slate-800">¿Por qué motivo fundamental NUNCA se debe arrancar o poner a funcionar un motor CD en conexión serie en vacío (sin carga mecánica acoplada)?</p>
+          <div class="space-y-2 text-sm bg-white p-4 border rounded-lg">
+            <label class="flex items-start gap-2 cursor-pointer p-1.5 hover:bg-slate-50 rounded">
+              <input type="radio" name="p4" value="a" required class="mt-1"> 
+              <span>a) La corriente en la armadura aumenta inmediatamente al infinito destruyendo el aislamiento de los devanados.</span>
+            </label>
+            <label class="flex items-start gap-2 cursor-pointer p-1.5 hover:bg-slate-50 rounded">
+              <input type="radio" name="p4" value="b"> 
+              <span>b) Al disminuir la carga, la corriente y el flujo caen a niveles muy bajos, provocando que la velocidad aumente drásticamente a valores peligrosos (embalamiento).</span>
+            </label>
+            <label class="flex items-start gap-2 cursor-pointer p-1.5 hover:bg-slate-50 rounded">
+              <input type="radio" name="p4" value="c"> 
+              <span>c) Porque la fuerza contraelectromotriz se vuelve negativa e invierte el sentido de giro del rotor inmediatamente.</span>
+            </label>
           </div>
         </div>
       `;
@@ -223,12 +261,12 @@
       let aciertos = 0;
       let total = 6;
 
-      const userEa1 = parseFloat(document.getElementById('resp-ea1').value);
-      const userT1  = parseFloat(document.getElementById('resp-t1').value);
-      const userEa2 = parseFloat(document.getElementById('resp-ea2').value);
-      const userEa3 = parseFloat(document.getElementById('resp-ea3').value);
-      const userEta3= parseFloat(document.getElementById('resp-eta3').value);
-      const userP4  = document.querySelector('input[name="p4"]:checked')?.value;
+      const userEa1 = parseFloat(document.getElementById('resp-ea1').value) || 0;
+      const userT1  = parseFloat(document.getElementById('resp-t1').value) || 0;
+      const userEa2 = parseFloat(document.getElementById('resp-ea2').value) || 0;
+      const userEa3 = parseFloat(document.getElementById('resp-ea3').value) || 0;
+      const userEta3= parseFloat(document.getElementById('resp-eta3').value) || 0;
+      const userP4  = document.querySelector('input[name="p4"]:checked')?.value || "Sin respuesta";
 
       const check = (val, target) => Math.abs(val - target) <= Math.abs(target * 0.02);
 
@@ -247,6 +285,50 @@
 
       document.getElementById('sec-examen').classList.add('hidden');
       document.getElementById('sec-resultados').classList.remove('hidden');
+
+      // Enviar resultados por correo al docente
+      enviarResultadosPorCorreo({
+        estudiante: nombreEstudiante,
+        matricula: matriculaEstudiante,
+        calificacion: `${calificacion}% (${aciertos}/${total})`,
+        respuestas: {
+          Ea1: `${userEa1} V (Correcto: ${datosCalculados.Ea1.toFixed(2)} V)`,
+          T1: `${userT1} N·m (Correcto: ${datosCalculados.T1.toFixed(2)} N·m)`,
+          Ea2: `${userEa2} V (Correcto: ${datosCalculados.Ea2.toFixed(2)} V)`,
+          Ea3: `${userEa3} V (Correcto: ${datosCalculados.Ea3.toFixed(2)} V)`,
+          Eta3: `${userEta3}% (Correcto: ${datosCalculados.Eta3.toFixed(2)}%)`,
+          P4: `${userP4} (Correcto: b)`
+        }
+      });
+    }
+
+    function enviarResultadosPorCorreo(reporte) {
+      const elEstatus = document.getElementById('disp-estatus-envio');
+      
+      if (FORMSPREE_ENDPOINT === 'URL_FORMSPREE_AQUI') {
+        elEstatus.innerText = "⚠️ Nota: Configura tu endpoint de Formspree para recibir los correos.";
+        elEstatus.className = "text-xs font-semibold text-amber-600 mt-2";
+        return;
+      }
+
+      fetch(FORMSPREE_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reporte)
+      })
+      .then(res => {
+        if (res.ok) {
+          elEstatus.innerText = "✓ Resultados enviados exitosamente al profesor.";
+          elEstatus.className = "text-xs font-semibold text-emerald-600 mt-2";
+        } else {
+          elEstatus.innerText = "❌ Hubo un detalle al enviar el correo. El alumno debe guardar en PDF.";
+          elEstatus.className = "text-xs font-semibold text-rose-600 mt-2";
+        }
+      })
+      .catch(() => {
+        elEstatus.innerText = "❌ Error de conexión al enviar el correo.";
+        elEstatus.className = "text-xs font-semibold text-rose-600 mt-2";
+      });
     }
   </script>
 </body>
